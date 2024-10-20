@@ -1,20 +1,44 @@
 ---
-import { type CollectionEntry, getCollection } from 'astro:content';
-import BlogPost from '../../layouts/BlogPost.astro';
+import { type CollectionEntry, getCollection } from "astro:content";
+import BlogPost from "../../layouts/BlogPost.astro";
+import { vaporCmsClient } from "../../vapor";
+import type { Article, ArticleList } from "@vaporcms/client-sdk-js";
 
 export async function getStaticPaths() {
-	const posts = await getCollection('blog');
-	return posts.map((post) => ({
-		params: { slug: post.slug },
-		props: post,
-	}));
-}
-type Props = CollectionEntry<'blog'>;
+  const articlesResponse = await vaporCmsClient.articles.list({
+    page: 1,
+    pageSize: 100,
+  });
 
-const post = Astro.props;
-const { Content } = await post.render();
+  let posts: ArticleList = [];
+  if (articlesResponse.ok) {
+    posts = articlesResponse.data.articles;
+  }
+
+  return posts.map((post) => ({
+    params: { slug: post.localized.en.slug },
+  }));
+}
+
+const { slug } = Astro.params;
+
+const articleResponse = await vaporCmsClient.articles.get({
+  slug,
+});
+
+let article: Article;
+if (articleResponse.ok) {
+  article = articleResponse.data;
+} else {
+  console.error(articleResponse.error.message);
+  throw new Error(articleResponse.error.message);
+}
+
+type Props = {
+  article: Article;
+};
 ---
 
-<BlogPost {...post.data}>
-	<Content />
+<BlogPost article={article}>
+  <div set:html={article.content.html} />
 </BlogPost>
